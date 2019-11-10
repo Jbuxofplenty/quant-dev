@@ -1,17 +1,17 @@
-FROM python:3.6-stretch
+FROM alpacamarkets/pylivetrader
 
-# Install talib
-RUN wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
-  tar -xvzf ta-lib-0.4.0-src.tar.gz && \
-  cd ta-lib/ && \
-  ./configure --prefix=/usr && \
-  make && \
-  make install
-RUN rm -R ta-lib ta-lib-0.4.0-src.tar.gz
+ARG APCA_API_SECRET_KEY
+ARG APCA_API_KEY_ID
+ARG APCA_API_BASE_URL
 
-RUN pip install pipenv
+ENV APCA_API_SECRET_KEY=$APCA_API_SECRET_KEY
+ENV APCA_API_KEY_ID=$APCA_API_KEY_ID
+ENV APCA_API_BASE_URL=$APCA_API_BASE_URL
 
-ADD Pipfile Pipfile.lock /tmp/
-ADD Pipfile Pipfile.lock /
+RUN mkdir /app
 
-RUN pipenv install --system --dev
+COPY . /app
+
+WORKDIR /app
+
+CMD pylivetrader run -f algo.py
