@@ -1,52 +1,49 @@
-from pylivetrader.api import order_target_percent, record, symbol
-import pandas as pd
+from pylivetrader.api import (
+    record, get_open_orders, get_datetime, cancel_order, order_target,
+    order_target_percent
+)
 
-
+# This example shows how to do a few things in pylivetrader with a portfolio.
 def initialize(context):
-    # The initialize method is called at the very start of your script's
-    # execution. You can set up anything you'll be needing later here. The
-    # context argument will be received by all pylivetrader methods in
-    # your script, and you can store information on it that you'd like to
-    # share between methods.
+    # We'll update orders that have been open for more than this many minutes.
+    context.order_timeout = 5
 
-    # This is the asset that we'll be trading.
-    context.asset = symbol('AAPL')
+    # Positions that have lost more than this percentage of their cost bases
+    # will be liquidated, as a sort of global stop loss.
+    context.loss_stop_percent = 12.5
+    # Conversely, positions that have gained this much will be sold off as a
+    # profit taking measure.
+    context.profit_take_percent = 15
 
+    # Positions that have come to occupy more than this percent of the
+    # portfolio will be trimmed.
+    context.max_portfolio_percent = 6
 
 def handle_data(context, data):
-    # The handle_data method is called by pylivetrader every minute when
-    # new data is received. This is where we'll execute our trading logic. For
-    # an explanation of pylivetrader function scheduling, please see here:
-    # https://github.com/alpacahq/pylivetrader#run.
+    # Get rid of orders that have gotten too old.
+    now = get_datetime('US/Eastern')
+    open_orders = get_open_orders()
+    for symbol in open_orders.keys():
+        for order in open_orders[symbol]:
+            age = now - order.dt.astimezone('US/Eastern')
+            if age.total_seconds() / 60 > context.order_timeout:
+                cancel_order(order)
 
-    # Compute averages
-    # data.history() will return a pandas dataframe with price information.
-    # pandas' EWM method will give us our exponential moving averages.
+    # Liquidate positions that have reached our profit take or stop loss level.
+    for asset in context.portfolio.positions.keys():
+        position = context.portfolio.positions[asset]
+        change = (position.cost_basis - position.last_sale_price) / position.cost_basis
+        change = change * 100
+        if change > context.loss_stop_percent or change > context.profit_take_percent:
+            order_target(position.asset, 0)
 
-    # Calculate short-term EMA (using data from the past 12 minutes.)
-    short_periods = 12
-    short_data = data.history(
-        context.asset, 'price', bar_count=short_periods, frequency="1m")
-    short_ema = pd.Series.ewm(short_data, span=short_periods).mean().iloc[-1]
-    # Calculate long-term EMA (using data from the past 26 minutes.)
-    long_periods = 26
-    long_data = data.history(
-        context.asset, 'price', bar_count=long_periods, frequency="1m")
-    long_ema = pd.Series.ewm(long_data, span=long_periods).mean().iloc[-1]
-
-    macd = short_ema - long_ema
-
-    # Trading logic
-    if macd > 0:
-        # order_target_percent allocates a specified percentage of your
-        # portfolio to a long position in a given asset. (A value of 1
-        # means that 100% of your portfolio will be allocated.)
-        order_target_percent(context.asset, 1)
-    elif macd < 0:
-        # You can supply a negative value to short an asset instead.
-        order_target_percent(context.asset, -1)
-
-    # Save values for later inspection
-    record(AAPL=data.current(context.asset, 'price'),
-           short_mavg=short_ema,
-           long_mavg=long_ema)
+    # Trim positions that exceed a certain percentage of our portfolio
+    portfolio_value = context.portfolio.portfolio_value
+    for asset in context.portfolio.positions.keys():
+        position = context.portfolio.positions[asset]
+        position_value = position.amount * position.last_sale_price
+        portfolio_share = position_value / portfolio_value * 100
+        if portfolio_share > context.max_portfolio_percent:
+            order_target_percent(
+                position.asset, context.max_portfolio_percent / 100
+            )
