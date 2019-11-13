@@ -1,7 +1,7 @@
 import alpaca_trade_api as tradeapi
 import requests
 import time
-from ta import macd
+from talib import MACD
 import numpy as np
 from datetime import datetime, timedelta
 from pytz import timezone
@@ -16,7 +16,7 @@ min_last_dv = 500000
 # Stop limit to default to
 default_stop = .95
 # How much of our portfolio to allocate to any one position
-risk = 0.001
+risk = 0.01
 
 
 def get_1000m_history_data(symbols):
@@ -213,7 +213,7 @@ def run(tickers, market_open_dt, market_close_dt):
                 volume_today[symbol] > 30000
             ):
                 # check for a positive, increasing MACD
-                hist = macd(
+                hist = MACD(
                     minute_history[symbol]['close'].dropna(),
                     n_fast=12,
                     n_slow=26
@@ -223,7 +223,7 @@ def run(tickers, market_open_dt, market_close_dt):
                     not (hist[-3] < hist[-2] < hist[-1])
                 ):
                     return
-                hist = macd(
+                hist = MACD(
                     minute_history[symbol]['close'].dropna(),
                     n_fast=40,
                     n_slow=60
@@ -276,7 +276,7 @@ def run(tickers, market_open_dt, market_close_dt):
             # Sell for a loss if it's fallen below our stop price
             # Sell for a loss if it's below our cost basis and MACD < 0
             # Sell for a profit if it's above our target price
-            hist = macd(
+            hist = MACD(
                 minute_history[symbol]['close'].dropna(),
                 n_fast=13,
                 n_slow=21

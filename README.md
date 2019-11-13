@@ -48,6 +48,43 @@ heroku config:set -a quant-dev APCA_API_BASE_URL=https://paper-api.alpaca.market
 heroku stack:set container -a quant-dev
 ```
 
+### Docker functions
+
+>Build an image
+```
+docker build -t quant-dev --build-arg APCA_API_KEY_ID=$APCA_API_KEY_ID --build-arg APCA_API_SECRET_KEY=$APCA_API_SECRET_KEY --build-arg APCA_API_BASE_URL=$APCA_API_BASE_URL  .
+```
+
+>View images
+```
+docker images
+```
+
+>Remove an image
+```
+docker image remove quant-dev
+```
+
+>View containers
+```
+docker container ls -a
+```
+
+>Delete a container
+```
+docker container rm quant-dev
+```
+
+>Remove all stopped containers
+```
+docker container prune
+```
+
+>Run a docker container with an interactive shell
+```
+docker run -it quant-dev sh
+```
+
 
 ## Initial Setup
 
