@@ -21,7 +21,7 @@ def initialize(context):
     context.max_portfolio_percent = 6
 
     # Set up potential stocks to purchase
-    context.potential_stocks = Stock(['AAPL', 'GOOG', 'MSFT'])
+    context.potential_stocks = ['AAPL', 'GOOG', 'MSFT']
 
 def handle_data(context, data):
     # Get rid of orders that have gotten too old.
