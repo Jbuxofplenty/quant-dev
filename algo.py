@@ -25,7 +25,6 @@ def initialize(context):
 
 def handle_data(context, data):
     # Get rid of orders that have gotten too old.
-    print('hi')
     logger.info(f'long_mavg')
     now = get_datetime('US/Eastern')
     open_orders = get_open_orders()
