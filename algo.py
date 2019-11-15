@@ -2,63 +2,9 @@ from pylivetrader.api import (
     record, get_open_orders, get_datetime, cancel_order, order_target,
     order_target_percent
 )
-
-def trade(orders, wait=30):
-    '''This is where we actually submit the orders and wait for them to fill.
-    Waiting is an important step since the orders aren't filled automatically,
-    which means if your buys happen to come before your sells have filled,
-    the buy orders will be bounced. In order to make the transition smooth,
-    we sell first and wait for all the sell orders to fill before submitting
-    our buy orders.
-    '''
-
-    # process the sell orders first
-    sells = [o for o in orders if o['side'] == 'sell']
-    for order in sells:
-        try:
-            logger.info(f'submit(sell): {order}')
-            api.submit_order(
-                symbol=order['symbol'],
-                qty=order['qty'],
-                side='sell',
-                type='market',
-                time_in_force='day',
-            )
-        except Exception as e:
-            logger.error(e)
-    count = wait
-    while count > 0:
-        pending = api.list_orders()
-        if len(pending) == 0:
-            logger.info(f'all sell orders done')
-            break
-        logger.info(f'{len(pending)} sell orders pending...')
-        time.sleep(1)
-        count -= 1
-
-    # process the buy orders next
-    buys = [o for o in orders if o['side'] == 'buy']
-    for order in buys:
-        try:
-            logger.info(f'submit(buy): {order}')
-            api.submit_order(
-                symbol=order['symbol'],
-                qty=order['qty'],
-                side='buy',
-                type='market',
-                time_in_force='day',
-            )
-        except Exception as e:
-            logger.error(e)
-    count = wait
-    while count > 0:
-        pending = api.list_orders()
-        if len(pending) == 0:
-            logger.info(f'all buy orders done')
-            break
-        logger.info(f'{len(pending)} buy orders pending...')
-        time.sleep(1)
-        count -= 1
+from iexfinance.stocks import (
+    Stock, get_historical_data, get_collections
+)
 
 # This example shows how to do a few things in pylivetrader with a portfolio.
 def initialize(context):
@@ -68,6 +14,7 @@ def initialize(context):
     # Positions that have lost more than this percentage of their cost bases
     # will be liquidated, as a sort of global stop loss.
     context.loss_stop_percent = 12.5
+
     # Conversely, positions that have gained this much will be sold off as a
     # profit taking measure.
     context.profit_take_percent = 15
@@ -75,6 +22,9 @@ def initialize(context):
     # Positions that have come to occupy more than this percent of the
     # portfolio will be trimmed.
     context.max_portfolio_percent = 6
+
+    # Set up potential stocks to purchase
+    context.potential_stocks = Stock(['AAPL', 'GOOG', 'MSFT'])
 
 def handle_data(context, data):
     # Get rid of orders that have gotten too old.
@@ -85,6 +35,23 @@ def handle_data(context, data):
             age = now - order.dt.astimezone('US/Eastern')
             if age.total_seconds() / 60 > context.order_timeout:
                 cancel_order(order)
+
+    # Check the moving averages of the potential stocks
+    for asset in context.potential_stocks:
+        short_mavg = data.history(asset, 'price', bar_count=100, frequency="1m").mean()
+        long_mavg = data.history(asset, 'price', bar_count=300, frequency="1m").mean()
+        log.info(f'stock: {asset}')
+        logger.info(f'short_mavg: {short_mavg}')
+        logger.info(f'long_mavg: {long_mavg}')
+        print(asset)
+
+        # Trading logic
+        if short_mavg > long_mavg:
+            # order_target orders as many shares as needed to
+            # achieve the desired number of shares.
+            order_target(asset, 100)
+        elif short_mavg < long_mavg:
+            order_target(asset, 0)
 
     # Liquidate positions that have reached our profit take or stop loss level.
     for asset in context.portfolio.positions.keys():
