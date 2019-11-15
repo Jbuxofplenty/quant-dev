@@ -2,9 +2,6 @@ from pylivetrader.api import (
     record, get_open_orders, get_datetime, cancel_order, order_target,
     order_target_percent
 )
-from iexfinance.stocks import (
-    Stock, get_historical_data, get_collections
-)
 
 # This example shows how to do a few things in pylivetrader with a portfolio.
 def initialize(context):
@@ -28,6 +25,8 @@ def initialize(context):
 
 def handle_data(context, data):
     # Get rid of orders that have gotten too old.
+    print('hi')
+    logger.info(f'long_mavg')
     now = get_datetime('US/Eastern')
     open_orders = get_open_orders()
     for symbol in open_orders.keys():

@@ -1,9 +1,5 @@
 FROM alpacamarkets/pylivetrader
 
-RUN pip3 uninstall -y iexfinance
-RUN pip3 uninstall -y iexfinance
-RUN pip install iexfinance
-
 ARG APCA_API_SECRET_KEY
 ARG APCA_API_KEY_ID
 ARG APCA_API_BASE_URL
