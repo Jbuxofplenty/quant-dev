@@ -1,3 +1,5 @@
+#!/usr/bin/env pylivetrader run
+
 from pylivetrader.api import (
     record, get_open_orders, get_datetime, cancel_order, order_target,
     order_target_percent
@@ -21,35 +23,49 @@ def initialize(context):
     context.max_portfolio_percent = 6
 
     # Set up potential stocks to purchase
-    context.potential_stocks = ['AAPL', 'GOOG', 'MSFT']
+    context.potential_stocks_symbols = ['AAPL', 'GOOG', 'MSFT']
+    context.potential_stocks_data = [symbols(sym) for sym in context.potential_stocks_symbols]
+
+def order_stocks(sym, num_stocks):
+    try:
+        order_target(sym, num_stocks)
+    except:
+        if num_stocks < 0:
+            print('Unable to sell: ', sym)
+        else:
+            print('Unable to order: ', sym)
+
+# Trim positions that exceed a certain percentage of our portfolio
+def order_percent(sym, context):
+    try:
+        order_target_percent(
+            sym, context.max_portfolio_percent / 100
+        )
+    except:
+        print('Unable to order: ', sym)
 
 def handle_data(context, data):
     # Get rid of orders that have gotten too old.
-    logger.info(f'long_mavg')
     now = get_datetime('US/Eastern')
     open_orders = get_open_orders()
-    for symbol in open_orders.keys():
-        for order in open_orders[symbol]:
+    for sym in open_orders.keys():
+        for order in open_orders[sym]:
             age = now - order.dt.astimezone('US/Eastern')
             if age.total_seconds() / 60 > context.order_timeout:
                 cancel_order(order)
 
     # Check the moving averages of the potential stocks
-    for asset in context.potential_stocks:
-        short_mavg = data.history(asset, 'price', bar_count=100, frequency="1m").mean()
-        long_mavg = data.history(asset, 'price', bar_count=300, frequency="1m").mean()
-        log.info(f'stock: {asset}')
-        logger.info(f'short_mavg: {short_mavg}')
-        logger.info(f'long_mavg: {long_mavg}')
-        print(asset)
+    for asset, sym in zip(context.potential_stocks_data, context.potential_stocks_symbols):
+        short_mavg = data.history(asset, 'price', bar_count=100, frequency="1m").mean().values[0]
+        long_mavg = data.history(asset, 'price', bar_count=300, frequency="1m").mean().values[0]
 
         # Trading logic
         if short_mavg > long_mavg:
             # order_target orders as many shares as needed to
             # achieve the desired number of shares.
-            order_target(asset, 100)
+            order_target(symbols(sym)[0], 100)
         elif short_mavg < long_mavg:
-            order_target(asset, 0)
+            order_stocks(symbols(sym)[0], 0)
 
     # Liquidate positions that have reached our profit take or stop loss level.
     for asset in context.portfolio.positions.keys():
@@ -57,7 +73,7 @@ def handle_data(context, data):
         change = (position.cost_basis - position.last_sale_price) / position.cost_basis
         change = change * 100
         if change > context.loss_stop_percent or change > context.profit_take_percent:
-            order_target(position.asset, 0)
+            order_stocks(position.asset, 0)
 
     # Trim positions that exceed a certain percentage of our portfolio
     portfolio_value = context.portfolio.portfolio_value
@@ -66,6 +82,4 @@ def handle_data(context, data):
         position_value = position.amount * position.last_sale_price
         portfolio_share = position_value / portfolio_value * 100
         if portfolio_share > context.max_portfolio_percent:
-            order_target_percent(
-                position.asset, context.max_portfolio_percent / 100
-            )
+            order_percent(position.asset, context)
